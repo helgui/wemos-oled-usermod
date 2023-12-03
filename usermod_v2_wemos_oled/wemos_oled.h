@@ -333,80 +333,80 @@ private:
         display.setFont(u8g2_font_profont10_tr);
         
         if (activeScreen == WO::Screen::MENU_POWER) {
-            drawLine(4, "POWER ON/OFF", 1);
+            drawLine(4, "POWER ON/OFF", 2);
             display.setFont(u8g2_font_open_iconic_embedded_4x_t);
-            display.drawGlyph(16, 32, 78);
+            display.drawGlyph(18, 35, 78);
         }
         
         if (activeScreen == WO::Screen::MENU_REBOOT) {
-            drawLine(4, "REBOOT", 16);
+            drawLine(4, "REBOOT", 17);
             display.setFont(u8g2_font_open_iconic_embedded_4x_t);
-            display.drawGlyph(16, 32, 79);
+            display.drawGlyph(16, 35, 79);
         }
 
         if (activeScreen == WO::Screen::MENU_FACTORY_RESET) {
-            drawLine(4, "HARD RESET", 6);
+            drawLine(4, "FACTORY RST", 5);
             display.setFont(u8g2_font_open_iconic_embedded_4x_t);
-            display.drawGlyph(16, 32, 71);
+            display.drawGlyph(18, 35, 71);
         }
 
         if (activeScreen == WO::Screen::MENU_AP) {
-            drawLine(4, "START AP", 11);
+            drawLine(4, "START AP", 12);
             display.setFont(u8g2_font_open_iconic_www_4x_t);
-            display.drawGlyph(16, 32, 81);
+            display.drawGlyph(18, 35, 81);
         }
 
         if (activeScreen == WO::Screen::MENU_COLOR) {
-            drawLine(4, "RANDOM COLOR", 1);
+            drawLine(4, "RANDOM COLOR", 2);
             display.setFont(u8g2_font_open_iconic_thing_4x_t);
-            display.drawGlyph(16, 32, 71);
+            display.drawGlyph(16, 35, 71);
         }
 
         if (activeScreen == WO::Screen::MENU_NEXT_EFFECT) {
-            drawLine(4, "NEXT EFFECT", 4);
+            drawLine(4, "NEXT EFFECT", 5);
             display.setFont(u8g2_font_open_iconic_play_4x_t);
-            display.drawGlyph(16, 32, 72);   
+            display.drawGlyph(16, 35, 72);   
         }
 
         if (activeScreen == WO::Screen::MENU_BRI_PLUS) {
-            drawLine(4, "+ BRIGHTNESS", 1);
+            drawLine(4, "+ BRIGHTNESS", 2);
             display.setFont(u8g2_font_open_iconic_text_4x_t);
-            display.drawGlyph(16, 32, 88); 
+            display.drawGlyph(16, 35, 88); 
         }
 
         if (activeScreen == WO::Screen::MENU_BRI_MINUS) {
-            drawLine(4, "- BRIGHTNESS", 1);
+            drawLine(4, "- BRIGHTNESS", 2);
             display.setFont(u8g2_font_open_iconic_text_4x_t);
-            display.drawGlyph(16, 32, 87); 
+            display.drawGlyph(16, 35, 87); 
         }
 
         if (activeScreen == WO::Screen::MENU_SCREENSAVER) {
-            drawLine(4, "SCREENSAVER", 4);
+            drawLine(4, "SCREENSAVER", 5);
             display.setFont(u8g2_font_open_iconic_mime_4x_t);
-            display.drawGlyph(16, 32, 68);    
+            display.drawGlyph(16, 35, 68);    
         }
 
         if (activeScreen == WO::Screen::MENU_EXIT) {
-            drawLine(4, "EXIT MENU", 8);
+            drawLine(4, "EXIT MENU", 10);
             display.setFont(u8g2_font_open_iconic_gui_4x_t);
-            display.drawGlyph(16, 32, 65);
+            display.drawGlyph(16, 35, 65);
         }
     }
 
     // draw animation splash screen
     void drawSplash() {
         display.setFont(u8g2_font_open_iconic_www_4x_t);
-        display.drawGlyph(16, 32, 72);
+        display.drawGlyph(16, 35, 72);
         display.setFont(u8g2_font_profont10_tr);
-        drawLine(4, "LOADING");
+        drawLine(4, "LOADING", 8);
         if (animationFrame > 0) {
-            display.drawGlyph(35, 47, '.');
+            display.drawGlyph(43, 47, '.');
         }
         if (animationFrame > 1) {
-            display.drawGlyph(40, 47, '.');
+            display.drawGlyph(48, 47, '.');
         }
         if (animationFrame > 2) {
-            display.drawGlyph(45, 47, '.');
+            display.drawGlyph(53, 47, '.');
         }
         if (animationFrame == 3) {
             animationFrame = 0;
