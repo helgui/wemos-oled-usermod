@@ -15,7 +15,7 @@
         38: blank
         39..47: fourth text line
     - Splash and menu screens:
-        0..31 picture
+        0..35 picture
         39..47 caption
 */
 
@@ -23,9 +23,10 @@ class WemosOledUsermod : public Usermod {
 private:
     using WO = WemosOledUsermod;
 
-    static constexpr unsigned long BTN_TIMEOUT = 350; // button debounce timeout
-    static constexpr unsigned long MENU_EXIT_TIMEOUT = 30000; // quit menu after 30 sec of inactivity
-    static constexpr unsigned long SCREENSAVER_TIMEOUT = 120000; // enable screensaver mod after 2 min of inactivity
+    static constexpr unsigned long BTN_TIMEOUT = 350;            // button debounce timeout
+    static constexpr unsigned long MENU_EXIT_TIMEOUT = 30000;    // quit menu after 30 sec of inactivity
+    static constexpr unsigned long SCREENSAVER_TIMEOUT = 120000; // enable screensaver mode after 2 min of inactivity
+    static constexpr unsigned long HIGHLIGHT_TIMEOUT = 10000;    // set min contrast after 10 sec of inactivity
 
     static constexpr const char* DAY_NAME[7] = {
         "SUNDAY", "MONDAY", "TUESDAY",
@@ -52,10 +53,11 @@ private:
         MENU_AP = 129,
         MENU_REBOOT = 130,
         MENU_FACTORY_RESET = 131,
-        MENU_SCREENSAVER = 132,
-        MENU_MAX_CONTRAST = 133,
-        MENU_MIN_CONTRAST = 134,
-        MENU_EXIT = 135,
+        MENU_NEXT_EFFECT = 132,
+        MENU_BRI_PLUS = 133,
+        MENU_BRI_MINUS = 134,
+        MENU_SCREENSAVER = 135,
+        MENU_EXIT = 136,
         SCREENSAVER_NIGHTSKY = 251,
         SCREENSAVER_CLOCK = 252,
         SCREENSAVER_EMPTY = 253,
@@ -65,25 +67,27 @@ private:
 
     U8G2_SSD1306_64X48_ER_F_HW_I2C display;
     
-    unsigned long lastUpdate;
-    unsigned long lastActionPress;
-    unsigned long lastMenuPress;
-    unsigned long lastWokeUp;
+    unsigned long lastUpdate;      // timepoint(ms) of latest render
+    unsigned long lastActionPress; // timepoint(ms) of latest action button press
+    unsigned long lastMenuPress;   // timepoint(ms) of latest menu button press
+    unsigned long lastWokeUp;      // timepoint(ms) of last `wakeUp` call
     
-    bool enabled;
-    uint8_t contrast;
+    bool enabled;            
+    uint8_t lowContrast;     // idle contrast
+    uint8_t highContrast;    // in-use contrast
     
-    bool ready;
-    bool redraw;
-    bool menu;
-    bool screenSaving;
+    bool ready;              // is display HW ready to communicate
+    bool redraw;             // force redraw flag
+    bool menu;               // menu opened
+    bool screenSaving;       // is display in ss mode
+    bool highlighting;       // is display highlighted
     bool ssClockMoveForward; // flag for animation in clock screensaver
 
-    WO::Screen activeScreen;
-    WO::Screen renderedScreen;
-    WO::Screen screenSaver;
-    WO::WifiMode wifiState;
-    uint16_t animationFrame;
+    WO::Screen activeScreen;   // screen to render
+    WO::Screen renderedScreen; // screen that's actually rendered
+    WO::Screen screenSaver;    // screensaver type: empty, clock or night sky
+    WO::WifiMode wifiState;    // current wifi mode
+    uint8_t animationFrame;   // used by splash screen and clock screensaver
 
     /* Utility functions */
 
@@ -134,9 +138,25 @@ private:
     void disable() {
         display.setPowerSave(1);
     }
-    
-    // exit screensaver mode
+
+    // enable display highlighting
+    void highlight() {
+        if (highlighting) return;
+        highlighting = true;
+        display.setContrast(highContrast);
+    }
+
+    // disable display higlighting
+    void setIdle() {
+        if (highlighting) {
+            highlighting = false;
+            display.setContrast(lowContrast);
+        }
+    }
+
+    // exit screensaver mode if needed and enable highlighting
     bool wakeUp() {
+        highlight();
         lastWokeUp = millis();
         if (screenSaving) {
             if (renderedScreen == WO::Screen::SCREENSAVER_EMPTY) {
@@ -207,24 +227,40 @@ private:
         if (activeScreen == WO::Screen::MENU_AP) {
             WLED::instance().initAP(true);
         }
+        if (activeScreen == WO::Screen::MENU_NEXT_EFFECT) {
+            if (effectCurrent == strip.getModeCount() - 1) {
+                effectCurrent = 0;
+            } else {
+                ++effectCurrent;
+            }
+            stateChanged = true;
+            colorUpdated(CALL_MODE_BUTTON);
+        }
+        if (activeScreen == WO::Screen::MENU_BRI_MINUS) {
+            if (bri >= 8) {
+                bri -= 8;
+                stateUpdated(CALL_MODE_BUTTON);
+            } else if (bri > 1) {
+                bri = 1;
+                stateUpdated(CALL_MODE_BUTTON);
+            }
+        }
+        if (activeScreen == WO::Screen::MENU_BRI_PLUS) {
+            if (bri <= 247) { 
+                bri += 8;
+                stateUpdated(CALL_MODE_BUTTON);
+            } else if (bri < 255) {
+                bri = 255;
+                stateUpdated(CALL_MODE_BUTTON);
+            }
+        }
         if (activeScreen == WO::Screen::MENU_COLOR) {
             setRandomColor(col);
             colorUpdated(CALL_MODE_BUTTON);
         }
-        if (activeScreen == WO::Screen::MENU_MIN_CONTRAST) {
-            if (contrast > 0) {
-                display.setContrast(0);
-                contrast = 0;
-            }
-        }
-        if (activeScreen == WO::Screen::MENU_MAX_CONTRAST) {
-            if (contrast < 255) {
-                display.setContrast(255);
-                contrast = 255;
-            }
-        }
         if (activeScreen == WO::Screen::MENU_SCREENSAVER) {
             exitMenu();
+            setIdle(); // disable highlighting as it's guaranteedly enabled atm
             screenSaving = true;
             return;
         }
@@ -272,76 +308,88 @@ private:
 
     void drawDisplayInfo() {
         display.setFont(u8g2_font_profont10_tr);
-        drawLine(1, "CONTRAST:");
-        display.setCursor(45, 17);
-        display.print(contrast);
-        drawLine(2, "SCREENSAVER:");
+        
+        drawLine(1, "MIN CTR:");
+        display.setCursor(40, 17);
+        display.print(lowContrast);
+        
+        drawLine(2, "MAX CTR:");
+        display.setCursor(40, 27);
+        display.print(highContrast);
+        
+        drawLine(3, "SCREENSAVER:");
         if (screenSaver == WO::Screen::SCREENSAVER_NIGHTSKY) {
-            drawLine(3, "NIGHT SKY");
+            drawLine(4, "NIGHT SKY");
             return;
         }
         if (screenSaver == WO::Screen::SCREENSAVER_EMPTY) {
-            drawLine(3, "EMPTY SCREEN");
+            drawLine(4, "EMPTY SCREEN");
             return;
         }
-        drawLine(3, "CLOCK");
+        drawLine(4, "CLOCK");
     }
 
     void drawMenuItem() {
         display.setFont(u8g2_font_profont10_tr);
         
         if (activeScreen == WO::Screen::MENU_POWER) {
-            drawLine(4, "POWER ON/OFF");
+            drawLine(4, "POWER ON/OFF", 1);
             display.setFont(u8g2_font_open_iconic_embedded_4x_t);
             display.drawGlyph(16, 32, 78);
         }
         
         if (activeScreen == WO::Screen::MENU_REBOOT) {
-            drawLine(4, "REBOOT");
+            drawLine(4, "REBOOT", 16);
             display.setFont(u8g2_font_open_iconic_embedded_4x_t);
             display.drawGlyph(16, 32, 79);
         }
 
         if (activeScreen == WO::Screen::MENU_FACTORY_RESET) {
-            drawLine(4, "HARD RESET");
+            drawLine(4, "HARD RESET", 6);
             display.setFont(u8g2_font_open_iconic_embedded_4x_t);
             display.drawGlyph(16, 32, 71);
         }
 
         if (activeScreen == WO::Screen::MENU_AP) {
-            drawLine(4, "START AP");
+            drawLine(4, "START AP", 11);
             display.setFont(u8g2_font_open_iconic_www_4x_t);
             display.drawGlyph(16, 32, 81);
         }
 
-        if (activeScreen == WO::Screen::MENU_EXIT) {
-            drawLine(4, "EXIT MENU");
-            display.setFont(u8g2_font_open_iconic_gui_4x_t);
-            display.drawGlyph(16, 32, 65);
-        }
-
         if (activeScreen == WO::Screen::MENU_COLOR) {
-            drawLine(4, "RANDOM COLOR");
+            drawLine(4, "RANDOM COLOR", 1);
             display.setFont(u8g2_font_open_iconic_thing_4x_t);
             display.drawGlyph(16, 32, 71);
         }
 
-        if (activeScreen == WO::Screen::MENU_MAX_CONTRAST) {
-            drawLine(4, "MAX CONTRAST");
-            display.setFont(u8g2_font_open_iconic_weather_4x_t);
-            display.drawGlyph(16, 32, 69);    
+        if (activeScreen == WO::Screen::MENU_NEXT_EFFECT) {
+            drawLine(4, "NEXT EFFECT", 4);
+            display.setFont(u8g2_font_open_iconic_play_4x_t);
+            display.drawGlyph(16, 32, 72);   
         }
 
-        if (activeScreen == WO::Screen::MENU_MIN_CONTRAST) {
-            drawLine(4, "MIN CONTRAST");
-            display.setFont(u8g2_font_open_iconic_weather_4x_t);
-            display.drawGlyph(16, 32, 66);    
+        if (activeScreen == WO::Screen::MENU_BRI_PLUS) {
+            drawLine(4, "+ BRIGHTNESS", 1);
+            display.setFont(u8g2_font_open_iconic_text_4x_t);
+            display.drawGlyph(16, 32, 88); 
+        }
+
+        if (activeScreen == WO::Screen::MENU_BRI_MINUS) {
+            drawLine(4, "- BRIGHTNESS", 1);
+            display.setFont(u8g2_font_open_iconic_text_4x_t);
+            display.drawGlyph(16, 32, 87); 
         }
 
         if (activeScreen == WO::Screen::MENU_SCREENSAVER) {
-            drawLine(4, "SCREENSAVER");
+            drawLine(4, "SCREENSAVER", 4);
             display.setFont(u8g2_font_open_iconic_mime_4x_t);
             display.drawGlyph(16, 32, 68);    
+        }
+
+        if (activeScreen == WO::Screen::MENU_EXIT) {
+            drawLine(4, "EXIT MENU", 8);
+            display.setFont(u8g2_font_open_iconic_gui_4x_t);
+            display.drawGlyph(16, 32, 65);
         }
     }
 
@@ -540,6 +588,8 @@ private:
         u8g2_uint_t y = (r >> 6) % 48;
         display.drawPixel(x, y);
         display.setDrawColor(0);
+        // don't worry about overflows
+        // as u8g2 can handle them
         display.drawPixel(x - 1, y - 1);
         display.drawPixel(x - 1, y);
         display.drawPixel(x - 1, y + 1);
@@ -555,7 +605,7 @@ private:
         u8g2_uint_t y = animationFrame % 29;
         u8g2_uint_t x = animationFrame / 29;
         if ((x & 1) > 0) {
-            y = 28 - y; 
+            y = 28 - y;
         }
         display.setFont(u8g2_font_profont22_tn);
         display.setCursor(x, y + 19);
@@ -589,7 +639,7 @@ private:
         drawClock();
         show();
         if (animationFrame == 0) ssClockMoveForward = true;
-        if (animationFrame == 289) ssClockMoveForward = false;
+        if (animationFrame == 231) ssClockMoveForward = false;
         if (ssClockMoveForward) {
             ++animationFrame;  
         } else {
@@ -605,7 +655,8 @@ public:
         lastMenuPress(0),
         lastWokeUp(0),
         enabled(false),
-        contrast(0), 
+        lowContrast(0),
+        highContrast(127),
         ready(false), 
         redraw(false),
         menu(false),
@@ -621,10 +672,9 @@ public:
     void setup() {
         display.begin();
         ready = true;
-        display.setContrast(contrast);
         if (enabled) {
-            enable();
             wakeUp(); // save actual activation time
+            enable();
             activeScreen = WO::Screen::SPLASH;
             startDrawing(false);
             drawSplash();
@@ -669,7 +719,10 @@ public:
         }
 
         auto inactivityPeriod = millis() - mostRecentAction();
-        if (inactivityPeriod >= WO::MENU_EXIT_TIMEOUT && menu) {
+        if (highlighting && inactivityPeriod >= WO::HIGHLIGHT_TIMEOUT) {
+            setIdle();
+        }
+        if (menu && inactivityPeriod >= WO::MENU_EXIT_TIMEOUT) {
             exitMenu();
         } 
         if (inactivityPeriod >= WO::SCREENSAVER_TIMEOUT) {
@@ -746,12 +799,14 @@ public:
     void addToConfig(JsonObject& root) {
         JsonObject top = root.createNestedObject("Display");
         top["enabled"] = enabled;
-        top["contrast"] = contrast;
+        top["loctr"] = lowContrast;
+        top["hictr"] = highContrast;
         top["screensaver"] = uint8_t(screenSaver) - 251;
     }
 
     void appendConfigData() {
-        oappend(SET_F("addInfo('Display:contrast', 1, 'Enter value within 0..255');"));
+        oappend(SET_F("addInfo('Display:loctr', 1, 'Inactive display contrast (0..255)');"));
+        oappend(SET_F("addInfo('Display:hictr', 1, 'Active display contrast (0..255)');"));
         oappend(SET_F("dd=addDropdown('Display','screensaver');"));
         oappend(SET_F("addOption(dd,'Night Sky',0);"));
         oappend(SET_F("addOption(dd,'Moving Clock',1);"));
@@ -760,12 +815,15 @@ public:
 
     bool readFromConfig(JsonObject& root) {
         JsonObject top = root["Display"];
-        bool newState = top["enabled"];
-        contrast = top["contrast"];
-        screenSaver = WO::Screen(uint8_t(top["screensaver"]) + 251);
+        bool newState = top["enabled"] | enabled;
+        lowContrast = top["lowctr"] | lowContrast;
+        highContrast = top["hictr"] | highContrast;
+        if (lowContrast > highContrast) {
+            lowContrast = highContrast;
+        }
+        screenSaver = WO::Screen(uint8_t(top["screensaver"] | 0) + 251) ;
         if (ready) {
             wakeUp();
-            display.setContrast(contrast);
             if (enabled != newState) {
                 if (newState) {
                     enable();
