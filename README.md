@@ -1,8 +1,21 @@
 # [WLED](https://github.com/Aircoookie/WLED) usermod for Wemos D1 mini OLED 0.66" shield
 Easy control over your [WLED](https://github.com/Aircoookie/WLED) instance with 64x48 screen and two buttons! 
 
-![info-screens](/img/info.gif "Info screens") ![menu](/img/menu.gif "Menu")
+## Features
+  * 7 info screens
 
+  ![info-screens](/img/info.gif "Info screens")
+
+  * 9 actions available through menu
+
+   ![menu](/img/menu.gif "Menu")
+
+  * Two animated screensavers + power save mode
+  * Auto brightness: low on idle and high when active
+
+## Usage
+See [guide](/guide.md)
+  
 ## Build
 Follow the steps below to add this usermod to your WLED build
   1. Move *usermod_v2_wemos_oled* to _WLED_ROOT/usermods_
