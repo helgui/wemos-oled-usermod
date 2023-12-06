@@ -639,7 +639,7 @@ private:
         drawClock();
         show();
         if (animationFrame == 0) ssClockMoveForward = true;
-        if (animationFrame == 231) ssClockMoveForward = false;
+        if (animationFrame == 202) ssClockMoveForward = false;
         if (ssClockMoveForward) {
             ++animationFrame;  
         } else {
