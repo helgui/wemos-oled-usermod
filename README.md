@@ -4,13 +4,16 @@ Easy control over your [WLED](https://github.com/Aircoookie/WLED) instance with 
 ## Features
   * 7 info screens
 
-  ![info-screens](/img/info.gif "Info screens")
+   ![info-screens](/img/info.gif "Info screens")
 
   * 9 actions available through menu
 
    ![menu](/img/menu.gif "Menu")
 
   * Two animated screensavers + power save mode
+
+   ![night-sky](/img/nightsky.gif "Night sky") ![clock](/img/clock.gif "Clock")
+   
   * Auto brightness: low on idle and high when active
 
 ## Usage
