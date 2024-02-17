@@ -816,7 +816,7 @@ public:
     bool readFromConfig(JsonObject& root) {
         JsonObject top = root["Display"];
         bool newState = top["enabled"] | enabled;
-        lowContrast = top["lowctr"] | lowContrast;
+        lowContrast = top["loctr"] | lowContrast;
         highContrast = top["hictr"] | highContrast;
         if (lowContrast > highContrast) {
             lowContrast = highContrast;
